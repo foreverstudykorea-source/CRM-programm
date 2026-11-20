@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // PGlite ships WASM + data files; load it with plain Node require instead of bundling.
+  serverExternalPackages: ["@electric-sql/pglite"],
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/@electric-sql/pglite/dist/**/*"],
+  },
   turbopack: {
     rules: {
       "*.css": {

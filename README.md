@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Forever Study CRM
 
-## Getting Started
+Forever Study akademiyasi uchun boshqaruv tizimi (CRM). Next.js 16, Tailwind CSS 4 va Postgres asosida.
 
-First, run the development server:
+## Rollar
+
+| Rol | Login (demo) | Nimani ko'radi |
+| --- | --- | --- |
+| O'quvchi | `oquvchi1` … `oquvchi25` | Bugungi dars: vaqt, xona, daraja, mavzu, ustoz. Haftalik jadval, kelgusi va o'tilgan mavzular, davomat foizi, shu oygi to'lov holati |
+| Ustoz | `ustoz1`, `ustoz2`, `ustoz3` | O'z guruhlari. Har dars uchun "Keldi / Kechikdi / Kelmadi" belgilash va bugungi mavzuni yozish |
+| Administrator | `admin` | Kelmagan o'quvchilar ro'yxati, ota-ona telefoni, bir bosishda qo'ng'iroq / SMS / tayyor xabar matni, qo'ng'iroq holati va izoh. O'quvchi va guruh qo'shish |
+| Moliya admini | `moliya` | Oylik kutilgan tushum, tushgan pul, qarzdorlar, 6 oylik grafik, to'lov usullari, to'lov qabul qilish |
+
+Barcha demo hisoblarning paroli: **`demo123`**.
+
+Har bir rol faqat o'z sahifalarini ochadi. Boshqa rol sahifasiga kirishga urinsa, o'z bosh sahifasiga qaytariladi (server tomonida tekshiriladi).
+
+## Kompyuterda ishga tushirish
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+So'ng http://localhost:3000 ni oching. Ma'lumotlar bazasi sozlash shart emas: `DATABASE_URL` bo'lmasa, ilova o'rnatilgan PGlite (WASM'dagi Postgres) dan foydalanadi va ma'lumotlarni `./.data/pglite` papkasiga saqlaydi. Birinchi ishga tushishda demo ma'lumotlar avtomatik yaratiladi.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Demo ma'lumotlarni qaytadan yaratish uchun serverni to'xtatib, `.data` papkasini o'chiring.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Vercel'ga joylash (deploy)
 
-## Learn More
+1. **GitHub'ga yuklang.** GitHub'da yangi bo'sh repo oching (masalan `forever-study-crm`), keyin:
+   ```bash
+   git remote add origin https://github.com/<USERNAME>/forever-study-crm.git
+   git push -u origin main
+   ```
+2. **Vercel'da loyiha yarating.** [vercel.com/new](https://vercel.com/new) → repo'ni tanlang → Framework: Next.js (avtomatik) → **Deploy**.
+3. **Ma'lumotlar bazasini ulang (muhim).** Vercel loyihasida **Storage → Create Database → Neon (Postgres)** ni tanlang va loyihaga ulang. Vercel `DATABASE_URL` o'zgaruvchisini o'zi qo'shadi. Jadvallar va demo ma'lumotlar birinchi so'rovda avtomatik yaratiladi.
+   > Bazasiz ham ishlaydi, lekin u holda ma'lumotlar xotirada turadi va server qayta ishga tushganda yo'qoladi. Bu faqat ko'rish uchun.
+4. **Environment Variables** (Settings → Environment Variables):
+   | Nomi | Qiymati |
+   | --- | --- |
+   | `SESSION_SECRET` | Uzun tasodifiy matn. Yaratish: `openssl rand -base64 32` |
+   | `SHOW_DEMO_ACCOUNTS` | Haqiqiy foydalanishda `false` (kirish sahifasidagi demo tugmalarni yashiradi) |
+   | `APP_TIMEZONE` | Ixtiyoriy, standart `Asia/Tashkent` |
+5. O'zgaruvchilarni qo'shgandan so'ng **Deployments → Redeploy** bosing.
 
-To learn more about Next.js, take a look at the following resources:
+### Haqiqiy ishga tushirishdan oldin
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `SESSION_SECRET` ni albatta o'rnating.
+- Demo hisoblar (`admin`, `moliya`, `ustoz1`…) paroli `demo123`. Haqiqiy ma'lumot kiritishdan oldin bazani tozalab, o'z xodimlaringizni qo'shing yoki parollarni almashtiring (`src/lib/seed.ts`).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Tuzilishi
 
-## Deploy on Vercel
+```
+src/
+  app/
+    login/            Kirish sahifasi
+    student/          O'quvchi: bugun, jadval
+    teacher/          Ustoz: guruhlar, davomat
+    admin/            Admin: qo'ng'iroqlar, o'quvchilar, guruhlar
+    finance/          Moliya: umumiy ko'rinish, to'lovlar
+    actions.ts        Barcha server actions (har biri rolni tekshiradi)
+  lib/
+    db.ts             Baza adapteri: Postgres (DATABASE_URL) yoki PGlite
+    schema.ts         Jadvallar (SQL)
+    seed.ts           Demo ma'lumotlar
+    data.ts           Barcha so'rovlar
+    auth.ts           Sessiya (imzolangan cookie) va rollar
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Baza qatlami almashtiriladigan: hamma so'rovlar oddiy SQL va `db.ts` dagi kichik `Db` interfeysi orqali o'tadi. Boshqa bazaga o'tish uchun faqat shu faylni o'zgartirish kifoya.
