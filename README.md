@@ -33,7 +33,7 @@ Demo ma'lumotlarni qaytadan yaratish uchun serverni to'xtatib, `.data` papkasini
    git remote add origin https://github.com/<USERNAME>/forever-study-crm.git
    git push -u origin main
    ```
-2. **Vercel'da loyiha yarating.** [vercel.com/new](https://vercel.com/new) → repo'ni tanlang → Framework: Next.js (avtomatik) → **Deploy**.
+2. **Vercel'da loyiha yarating.** [vercel.com/new](https://vercel.com/new) → repo'ni tanlang → Framework: Next.js (avtomatik) → **Root Directory: `./`** (o'zgartirmang, `package.json` repo ildizida) → **Deploy**.
 3. **Ma'lumotlar bazasini ulang (muhim).** Vercel loyihasida **Storage → Create Database → Neon (Postgres)** ni tanlang va loyihaga ulang. Vercel `DATABASE_URL` o'zgaruvchisini o'zi qo'shadi. Jadvallar va demo ma'lumotlar birinchi so'rovda avtomatik yaratiladi.
    > Bazasiz ham ishlaydi, lekin u holda ma'lumotlar xotirada turadi va server qayta ishga tushganda yo'qoladi. Bu faqat ko'rish uchun.
 4. **Environment Variables** (Settings → Environment Variables):
