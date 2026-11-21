@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { connection } from "next/server";
+import { ConfigError } from "@/components/config-error";
+import { configProblems } from "@/lib/health";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin", "latin-ext"] });
@@ -16,9 +18,11 @@ export const viewport: Viewport = { themeColor: "#0b1026", width: "device-width"
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Every page is rendered per request: it reads the session, and the CSP nonce must be fresh.
   await connection();
+  // A missing setting gets a clear page here instead of a generic error on every route.
+  const problems = await configProblems();
   return (
     <html lang="uz" className={`${jakarta.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">{problems.length ? <ConfigError problems={problems} /> : children}</body>
     </html>
   );
 }
