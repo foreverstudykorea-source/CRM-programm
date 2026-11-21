@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CalendarCheck2, Lock, PhoneCall, Wallet } from "lucide-react";
 import { getCurrentUser, HOME } from "@/lib/auth";
 import { activeAdminCount } from "@/lib/data";
+import { DemoBanner } from "@/components/demo-banner";
 import { Logo } from "@/components/logo";
 import { LoginForm } from "./login-form";
 import Link from "next/link";
@@ -15,6 +16,8 @@ export default async function LoginPage() {
   const needsSetup = (await activeAdminCount()) === 0;
 
   return (
+    <>
+    <DemoBanner />
     <div className="grid min-h-dvh bg-white lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden overflow-hidden bg-ink-950 p-12 text-white lg:flex lg:flex-col">
         <div className="mesh absolute inset-0 opacity-80" />
@@ -83,5 +86,6 @@ export default async function LoginPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

@@ -19,6 +19,10 @@ describe("demo seed", () => {
 
     const [{ n }] = await db.query<{ n: number }>(`select count(*)::int as n from attendance`);
     expect(n).toBeGreaterThan(50);
+
+    // The demo flag drives the "DEMO VERSIYA" banner on every page.
+    const [flag] = await db.query<{ value: string }>(`select value from app_settings where key = 'demo_data'`);
+    expect(flag?.value).toBe("1");
     await db.close();
   });
 });

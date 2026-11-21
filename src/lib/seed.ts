@@ -233,5 +233,10 @@ export async function seedDemo(db: Db, opts: { withAdmin: boolean; adminId?: num
     }
   });
   await insertMany(db, "payments", ["student_id", "amount", "month", "paid_at", "method", "note", "created_by"], payRows);
+  // Marks the whole system as demo, so every page shows a "Demo" banner.
+  await db.query(
+    `insert into app_settings (key, value) values ('demo_data', '1')
+     on conflict (key) do update set value = excluded.value, updated_at = now()`,
+  );
   return creds;
 }

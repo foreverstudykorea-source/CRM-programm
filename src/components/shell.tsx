@@ -3,6 +3,7 @@ import { ChevronDown, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import type { User } from "@/lib/auth";
 import { formatDate, today, WEEKDAYS, weekday } from "@/lib/dates";
+import { DemoBanner } from "./demo-banner";
 import { Logo } from "./logo";
 import { BottomNav, SideNav, type NavItem } from "./nav";
 import { Toaster } from "./toast";
@@ -53,6 +54,7 @@ export function Shell({ user, nav, children }: { user: User; nav: NavItem[]; chi
         </div>
       </aside>
 
+      <DemoBanner />
       <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-surface/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="lg:hidden">
