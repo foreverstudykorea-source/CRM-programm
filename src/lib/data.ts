@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { q, tx } from "./db";
 import { addDays, addMonths, today, weekday } from "./dates";
 
@@ -22,6 +23,12 @@ const GROUP_SELECT = `
   select g.*, u.name as teacher_name,
     (select count(*)::int from students s where s.group_id = g.id and s.active) as student_count
   from groups g left join users u on u.id = g.teacher_id`;
+
+/** True when the demo data was loaded (names, phones and payments are not real). */
+export const isDemo = cache(async (): Promise<boolean> => {
+  const [row] = await q<{ value: string }>(`select value from app_settings where key = 'demo_data'`);
+  return row?.value === "1";
+});
 
 export async function listGroups(): Promise<Group[]> {
   return q<Group>(`${GROUP_SELECT} order by g.start_time, g.name`);

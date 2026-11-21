@@ -154,6 +154,15 @@ create index if not exists idx_attendance_student on attendance(student_id);
 create index if not exists idx_students_group on students(group_id);
 `;
 
+/** v3: small key/value settings (e.g. whether the demo data is loaded). */
+const V3 = `
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+`;
+
 type Migration = { id: number; name: string; up: (db: Db) => Promise<void> };
 
 export const MIGRATIONS: Migration[] = [
@@ -176,6 +185,7 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  { id: 3, name: "app settings", up: (db) => db.exec(V3) },
 ];
 
 const LOCK_ID = 7_310_412; // arbitrary constant for pg_advisory_xact_lock

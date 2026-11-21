@@ -21,6 +21,23 @@ export function SetupForm({ tokenConfigured }: { tokenConfigured: boolean }) {
             Quyidagi parollar faqat hozir ko&apos;rsatiladi. Ularni saqlab oling yoki keyin &quot;Xodimlar&quot; bo&apos;limida yangisini yarating.
           </div>
         </div>
+        <div>
+          <div className="eyebrow mb-2 text-slate-500">Har bir rolni sinab ko&apos;rish uchun</div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {["moliya", "ustoz1", "oquvchi1"].map((login) => {
+              const c = state.credentials!.find((x) => x.login === login);
+              if (!c) return null;
+              return (
+                <div key={login} className="rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200/70">
+                  <div className="text-xs font-semibold text-slate-500">{ROLE[c.role]}</div>
+                  <div className="mt-1 font-mono">{c.login}</div>
+                  <div className="font-mono font-bold text-slate-900">{c.password}</div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Administrator sifatida o&apos;zingiz yaratgan login bilan kirasiz.</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <CopyButton value={text} label="Hammasini nusxalash" className="btn-ghost" />
           <a
@@ -90,7 +107,7 @@ export function SetupForm({ tokenConfigured }: { tokenConfigured: boolean }) {
         </Field>
       </div>
       <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
-        <input type="checkbox" name="demo" defaultChecked={v(state, "demo") === "on"} className="mt-0.5 size-4 accent-brand-600" />
+        <input type="checkbox" name="demo" defaultChecked={state ? v(state, "demo") === "on" : true} className="mt-0.5 size-4 accent-brand-600" />
         <span className="text-sm">
           <span className="font-bold text-slate-800">Demo ma&apos;lumotlar bilan to&apos;ldirish</span>
           <span className="block text-slate-500">
