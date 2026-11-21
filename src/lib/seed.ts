@@ -1,9 +1,11 @@
-import type { Db } from "./db";
+import type { Db } from "./db-core";
 import { addDays, addMonths, monthOf, today, weekday } from "./dates";
-import { hashPassword } from "./password";
+import { generatePassword, hashPassword } from "./password";
 
-/** Demo password for every seeded account. Change or remove accounts before real use. */
-export const DEMO_PASSWORD = "demo123";
+export type Credential = { name: string; login: string; role: string; password: string };
+
+/** Logins created by the demo data; the owner's own login must not be one of these. */
+export const DEMO_LOGINS = ["admin", "moliya", "ustoz1", "ustoz2", "ustoz3", ...Array.from({ length: 25 }, (_, i) => `oquvchi${i + 1}`)];
 
 // Small deterministic random generator so the demo looks the same every time.
 function rng(seedNum: number) {
@@ -65,24 +67,34 @@ const TOPICS: Record<string, string[]> = {
   ],
 };
 
-export async function seed(db: Db) {
-  const hash = hashPassword(DEMO_PASSWORD);
+/**
+ * Fills an empty database with demo data. Every account gets its own random password,
+ * returned once to the caller and stored only as an Argon2id hash.
+ * Pass `withAdmin: false` when the owner's admin account already exists.
+ */
+export async function seedDemo(db: Db, opts: { withAdmin: boolean; adminId?: number }): Promise<Credential[]> {
+  const creds: Credential[] = [];
+  const account = async (name: string, login: string, role: string) => {
+    const password = generatePassword();
+    creds.push({ name, login, role, password });
+    return hashPassword(password);
+  };
   const rand = rng(2026);
   const t = today();
 
   // --- Staff -----------------------------------------------------------------
-  const [adminId, financeId, t1, t2, t3] = await insertMany(
-    db,
-    "users",
-    ["name", "login", "password_hash", "role", "phone"],
-    [
-      ["Nilufar Azimova", "admin", hash, "admin", "+998 90 111 22 33"],
-      ["Sardor Qodirov", "moliya", hash, "finance", "+998 90 444 55 66"],
-      ["Dilnoza Karimova", "ustoz1", hash, "teacher", "+998 91 234 56 78"],
-      ["Jasur Toshmatov", "ustoz2", hash, "teacher", "+998 93 345 67 89"],
-      ["Madina Rahimova", "ustoz3", hash, "teacher", "+998 94 456 78 90"],
-    ],
-  );
+  const staff: [string, string, string, string][] = [
+    ["Sardor Qodirov", "moliya", "finance", "+998 90 444 55 66"],
+    ["Dilnoza Karimova", "ustoz1", "teacher", "+998 91 234 56 78"],
+    ["Jasur Toshmatov", "ustoz2", "teacher", "+998 93 345 67 89"],
+    ["Madina Rahimova", "ustoz3", "teacher", "+998 94 456 78 90"],
+  ];
+  if (opts.withAdmin) staff.unshift(["Nilufar Azimova", "admin", "admin", "+998 90 111 22 33"]);
+  const staffRows: unknown[][] = [];
+  for (const [name, login, role, phone] of staff) staffRows.push([name, login, await account(name, login, role), role, phone]);
+  const staffIds = await insertMany(db, "users", ["name", "login", "password_hash", "role", "phone"], staffRows);
+  if (!opts.withAdmin) staffIds.unshift(opts.adminId ?? 0);
+  const [adminId, financeId, t1, t2, t3] = staffIds;
 
   // --- Groups ----------------------------------------------------------------
   const groupDefs = [
@@ -108,12 +120,13 @@ export async function seed(db: Db) {
     "Valiyev", "Nurmatova", "Shodiyev", "Ahmedova", "Fayziyev"];
   const parentFirst = ["Rustam", "Gulchehra", "Anvar", "Dilfuza", "Farhod", "Mavluda", "Shuhrat", "Nargiza", "Baxtiyor", "Feruza"];
 
-  const studentUsers = await insertMany(
-    db,
-    "users",
-    ["name", "login", "password_hash", "role", "phone"],
-    first.map((f, i) => [`${f} ${last[i]}`, `oquvchi${i + 1}`, hash, "student", `+998 9${i % 10} ${100 + i * 7} ${10 + i} ${20 + i}`]),
-  );
+  const studentUserRows: unknown[][] = [];
+  for (let i = 0; i < first.length; i++) {
+    const name = `${first[i]} ${last[i]}`;
+    const login = `oquvchi${i + 1}`;
+    studentUserRows.push([name, login, await account(name, login, "student"), "student", `+998 9${i % 10} ${100 + i * 7} ${10 + i} ${20 + i}`]);
+  }
+  const studentUsers = await insertMany(db, "users", ["name", "login", "password_hash", "role", "phone"], studentUserRows);
   const studentRows = first.map((f, i) => {
     const surname = last[i].replace(/a$/, "");
     const pi = i % parentFirst.length;
@@ -191,9 +204,12 @@ export async function seed(db: Db) {
     if (a.status !== "absent" || a.date > addDays(t, -3)) return;
     const r = rand();
     const status = r < 0.6 ? "called" : r < 0.85 ? "messaged" : "no_answer";
-    callRows.push([attIds[i], status, notes[status], adminId]);
+    callRows.push([attIds[i], status, notes[status], adminId || null]);
   });
-  if (callRows.length) await insertMany(db, "calls", ["attendance_id", "status", "note", "updated_by"], callRows);
+  if (callRows.length) {
+    await insertMany(db, "calls", ["attendance_id", "status", "note", "updated_by"], callRows);
+    await insertMany(db, "call_logs", ["attendance_id", "outcome", "note", "created_by"], callRows);
+  }
 
   // --- Payments: previous 3 months mostly paid, current month partly ---------
   const thisMonth = monthOf(t);
@@ -217,4 +233,5 @@ export async function seed(db: Db) {
     }
   });
   await insertMany(db, "payments", ["student_id", "amount", "month", "paid_at", "method", "note", "created_by"], payRows);
+  return creds;
 }
