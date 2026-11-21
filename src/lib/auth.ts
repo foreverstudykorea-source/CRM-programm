@@ -1,64 +1,26 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { cache } from "react";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { q } from "./db";
+import { getDb } from "./db";
+import {
+  createSessionRow,
+  findSession,
+  revokeSession,
+  SESSION_MAX_SECONDS,
+  writeAudit,
+  type AuditEntry,
+  type Role,
+  type SessionUser,
+} from "./security";
 
-export type Role = "student" | "teacher" | "admin" | "finance";
-export type User = { id: number; name: string; login: string; role: Role; phone: string | null };
+export type { Role } from "./security";
+export type User = SessionUser;
 
-const COOKIE = "fs_session";
-const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
-
-function secret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production") {
-    // Still works on a fresh deploy, but anyone who reads the code could forge a session.
-    console.warn("[auth] SESSION_SECRET is not set. Set it in Vercel → Settings → Environment Variables.");
-  }
-  return s || "forever-study-dev-secret-change-me";
-}
-
-function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
-}
-
-export async function createSession(userId: number) {
-  const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
-  const payload = `${userId}.${exp}`;
-  const jar = await cookies();
-  jar.set(COOKIE, `${payload}.${sign(payload)}`, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
-}
-
-export async function destroySession() {
-  (await cookies()).delete(COOKIE);
-}
-
-async function readUserId(): Promise<number | null> {
-  const raw = (await cookies()).get(COOKIE)?.value;
-  if (!raw) return null;
-  const parts = raw.split(".");
-  if (parts.length !== 3) return null;
-  const [id, exp, sig] = parts;
-  const expected = Buffer.from(sign(`${id}.${exp}`));
-  const given = Buffer.from(sig);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
-  if (Number(exp) < Date.now() / 1000) return null;
-  return Number(id);
-}
-
-export async function getCurrentUser(): Promise<User | null> {
-  const id = await readUserId();
-  if (!id) return null;
-  const [user] = await q<User>("select id, name, login, role, phone from users where id = $1", [id]);
-  return user ?? null;
-}
+const secure = process.env.NODE_ENV === "production";
+// The __Host- prefix makes the browser refuse the cookie unless it is Secure, has
+// Path=/ and no Domain, so a sibling subdomain cannot plant or overwrite it.
+export const SESSION_COOKIE = secure ? "__Host-fs_sid" : "fs_sid";
 
 export const HOME: Record<Role, string> = {
   student: "/student",
@@ -67,10 +29,65 @@ export const HOME: Record<Role, string> = {
   finance: "/finance",
 };
 
-/** Use at the top of every role page/action. Redirects if the user may not be here. */
-export async function requireRole(...roles: Role[]): Promise<User> {
+export async function clientMeta() {
+  const h = await headers();
+  const ip =
+    h.get("x-real-ip")?.trim() ||
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    null;
+  return { ip: ip ? ip.slice(0, 64) : null, userAgent: h.get("user-agent") };
+}
+
+export async function startSession(userId: number) {
+  const db = await getDb();
+  const { token } = await createSessionRow(db, userId, await clientMeta());
+  (await cookies()).set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_MAX_SECONDS,
+    priority: "high",
+  });
+}
+
+export async function endSession() {
+  const jar = await cookies();
+  const s = await getSession();
+  if (s) await revokeSession(await getDb(), s.id);
+  jar.delete(SESSION_COOKIE);
+}
+
+/** Current session, looked up once per request. */
+export const getSession = cache(async () => {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return findSession(await getDb(), token);
+});
+
+export async function getCurrentUser(): Promise<User | null> {
+  return (await getSession())?.user ?? null;
+}
+
+/** Any signed-in user. Users with a temporary password are sent to change it first. */
+export async function requireUser(opts: { allowTempPassword?: boolean } = {}): Promise<User> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (user.must_change_password && !opts.allowTempPassword) redirect("/hisob?yangi=1");
+  return user;
+}
+
+/**
+ * Use at the top of every page and every server action. Authorization is checked on the
+ * server for each request; hiding a link in the UI is never the protection.
+ */
+export async function requireRole(...roles: Role[]): Promise<User> {
+  const user = await requireUser();
   if (!roles.includes(user.role)) redirect(HOME[user.role]);
   return user;
+}
+
+export async function audit(actor: User | null, entry: AuditEntry) {
+  const { ip } = await clientMeta();
+  await writeAudit(await getDb(), actor ? { id: actor.id, name: actor.name, role: actor.role } : null, entry, ip);
 }
